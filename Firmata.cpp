@@ -16,6 +16,7 @@
 
 #include "Firmata.h"
 #include "HardwareSerial.h"
+#include "ble_shield.h"
 
 extern "C" {
 #include <string.h>
@@ -28,18 +29,18 @@ extern "C" {
 
 void FirmataClass::sendValueAsTwo7bitBytes(int value)
 {
-  FirmataSerial->write(value & B01111111); // LSB
-  FirmataSerial->write(value >> 7 & B01111111); // MSB
+  ble_write(value & B01111111); // LSB
+  ble_write(value >> 7 & B01111111); // MSB
 }
 
 void FirmataClass::startSysex(void)
 {
-  FirmataSerial->write(START_SYSEX);
+  ble_write(START_SYSEX);
 }
 
 void FirmataClass::endSysex(void)
 {
-  FirmataSerial->write(END_SYSEX);
+  ble_write(END_SYSEX);
 }
 
 //******************************************************************************
@@ -66,8 +67,8 @@ void FirmataClass::begin(void)
 /* begin method for overriding default serial bitrate */
 void FirmataClass::begin(long speed)
 {
-  Serial.begin(speed);
-  FirmataSerial = &Serial;
+  //Serial.begin(speed);
+  //FirmataSerial = &Serial;
   blinkVersion();
   printVersion();
   printFirmwareVersion();
@@ -85,9 +86,9 @@ void FirmataClass::begin(Stream &s)
 
 // output the protocol version message to the serial port
 void FirmataClass::printVersion(void) {
-  FirmataSerial->write(REPORT_VERSION);
-  FirmataSerial->write(FIRMATA_MAJOR_VERSION);
-  FirmataSerial->write(FIRMATA_MINOR_VERSION);
+  ble_write(REPORT_VERSION);
+  ble_write(FIRMATA_MAJOR_VERSION);
+  ble_write(FIRMATA_MINOR_VERSION);
 }
 
 void FirmataClass::blinkVersion(void)
@@ -96,7 +97,7 @@ void FirmataClass::blinkVersion(void)
   pinMode(VERSION_BLINK_PIN,OUTPUT);
   strobeBlinkPin(FIRMATA_MAJOR_VERSION, 40, 210);
   delay(250);
-  strobeBlinkPin(FIRMATA_MINOR_VERSION, 40, 210);
+  strobeBlinkPin(FIRMATA_MAJOR_VERSION, 40, 210);
   delay(125);
 }
 
@@ -106,11 +107,13 @@ void FirmataClass::printFirmwareVersion(void)
 
   if(firmwareVersionCount) { // make sure that the name has been set before reporting
     startSysex();
-    FirmataSerial->write(REPORT_FIRMWARE);
-    FirmataSerial->write(firmwareVersionVector[0]); // major version number
-    FirmataSerial->write(firmwareVersionVector[1]); // minor version number
+    ble_write(REPORT_FIRMWARE);
+    ble_write(firmwareVersionVector[0]); // major version number
+    ble_write(firmwareVersionVector[1]); // minor version number
     for(i=2; i<firmwareVersionCount; ++i) {
       sendValueAsTwo7bitBytes(firmwareVersionVector[i]);
+	  if(i%9==0)
+		  ble_do_events();
     }
     endSysex();
   }
@@ -131,9 +134,9 @@ void FirmataClass::setFirmwareNameAndVersion(const char *name, byte major, byte 
     firmwareVersionCount = strlen(name) + 2;
     filename = name;
   }
-
+  
   free(firmwareVersionVector);
-
+  
   firmwareVersionVector = (byte *) malloc(firmwareVersionCount);
   firmwareVersionVector[firmwareVersionCount] = 0;
   firmwareVersionVector[0] = major;
@@ -151,13 +154,13 @@ void FirmataClass::setFirmwareNameAndVersion(const char *name, byte major, byte 
 //   free(firmwareVersionVector); 
 //   firmwareVersionVector = 0;
 // }
- 
+
 //------------------------------------------------------------------------------
 // Serial Receive Handling
 
 int FirmataClass::available(void)
 {
-  return FirmataSerial->available();
+  return ble_available();
 }
 
 
@@ -191,11 +194,11 @@ void FirmataClass::processSysexMessage(void)
 
 void FirmataClass::processInput(void)
 {
-  int inputData = FirmataSerial->read(); // this is 'int' to handle -1 when no data
+  int inputData = ble_read(); // this is 'int' to handle -1 when no data
   int command;
     
   // TODO make sure it handles -1 properly
-  
+
   if (parsingSysex) {
     if(inputData == END_SYSEX) {
       //stop sysex byte      
@@ -283,7 +286,7 @@ void FirmataClass::processInput(void)
 void FirmataClass::sendAnalog(byte pin, int value) 
 {
   // pin can only be 0-15, so chop higher bits
-  FirmataSerial->write(ANALOG_MESSAGE | (pin & 0xF));
+  ble_write(ANALOG_MESSAGE | (pin & 0xF));
   sendValueAsTwo7bitBytes(value);
 }
 
@@ -314,9 +317,9 @@ void FirmataClass::sendDigital(byte pin, int value)
 // send an 8-bit port in a single digital message (protocol v2)
 void FirmataClass::sendDigitalPort(byte portNumber, int portData)
 {
-  FirmataSerial->write(DIGITAL_MESSAGE | (portNumber & 0xF));
-  FirmataSerial->write((byte)portData % 128); // Tx bits 0-6
-  FirmataSerial->write(portData >> 7);  // Tx bits 7-13
+  ble_write(DIGITAL_MESSAGE | (portNumber & 0xF));
+  ble_write((byte)portData % 128); // Tx bits 0-6
+  ble_write(portData >> 7);  // Tx bits 7-13
 }
 
 
@@ -324,9 +327,11 @@ void FirmataClass::sendSysex(byte command, byte bytec, byte* bytev)
 {
   byte i;
   startSysex();
-  FirmataSerial->write(command);
+  ble_write(command);
   for(i=0; i<bytec; i++) {
-    sendValueAsTwo7bitBytes(bytev[i]);        
+    sendValueAsTwo7bitBytes(bytev[i]); 
+	if(i%16==0)
+		ble_do_events();       
   }
   endSysex();
 }
@@ -346,9 +351,8 @@ void FirmataClass::sendString(const char* string)
 // expose the write method
 void FirmataClass::write(byte c)
 {
-  FirmataSerial->write(c);
+  ble_write(c);
 }
-
 
 // Internal Actions/////////////////////////////////////////////////////////////
 
@@ -444,7 +448,7 @@ void FirmataClass::systemReset(void)
 
 // =============================================================================
 // used for flashing the pin for the version number
-void FirmataClass::strobeBlinkPin(int count, int onInterval, int offInterval) 
+void FirmataClass::strobeBlinkPin(int count, int onInterval, int offInterval)
 {
   byte i;
   pinMode(VERSION_BLINK_PIN, OUTPUT);

@@ -93,12 +93,12 @@ public:
     void begin(long);
     void begin(Stream &s);
 /* querying functions */
-    void printVersion(void);
+	void printVersion(void);
     void blinkVersion(void);
     void printFirmwareVersion(void);
   //void setFirmwareVersion(byte major, byte minor);  // see macro below
     void setFirmwareNameAndVersion(const char *name, byte major, byte minor);
-    //void unsetFirmwareVersion(); // only used for unit test
+	//void unsetFirmwareVersion(); // only used for unit test
 /* serial receive handling */
     int available(void);
     void processInput(void);
@@ -107,9 +107,9 @@ public:
     void sendDigital(byte pin, int value); // TODO implement this
     void sendDigitalPort(byte portNumber, int portData);
     void sendString(const char* string);
+	void write(byte c);
     void sendString(byte command, const char* string);
-    void sendSysex(byte command, byte bytec, byte* bytev);
-    void write(byte c);
+	void sendSysex(byte command, byte bytec, byte* bytev);
 /* attach & detach callback functions to messages */
     void attach(byte command, callbackFunction newFunction);
     void attach(byte command, systemResetCallbackFunction newFunction);

@@ -1,3 +1,4 @@
+
 /*
  * Firmata is a generic protocol for communicating with microcontrollers
  * from software on a host computer. It is intended to work with
@@ -30,6 +31,10 @@
  */
 
 #include <Servo.h>
+#include <SPI.h>
+#include <boards.h>
+#include <ble_shield.h>
+#include <services.h> 
 #include <Wire.h>
 #include <Firmata.h>
 
@@ -101,8 +106,8 @@ void readAndReportData(byte address, int theRegister, byte numBytes) {
     Wire.endTransmission();
     // do not set a value of 0
     if (i2cReadDelayTime > 0) {
-      // delay is necessary for some devices such as WiiNunchuck
-      delayMicroseconds(i2cReadDelayTime);
+    // delay is necessary for some devices such as WiiNunchuck
+        delayMicroseconds(i2cReadDelayTime);
     }
   } else {
     theRegister = 0;  // fill the register with a dummy value
@@ -459,57 +464,60 @@ void sysexCallback(byte command, byte argc, byte *argv)
     }
     break;
   case CAPABILITY_QUERY:
-    Firmata.write(START_SYSEX);
-    Firmata.write(CAPABILITY_RESPONSE);
+    ble_write(START_SYSEX);
+    ble_write(CAPABILITY_RESPONSE);
     for (byte pin=0; pin < TOTAL_PINS; pin++) {
       if (IS_PIN_DIGITAL(pin)) {
-        Firmata.write((byte)INPUT);
-        Firmata.write(1);
-        Firmata.write((byte)OUTPUT);
-        Firmata.write(1);
+        ble_write((byte)INPUT);
+        ble_write(1);
+        ble_write((byte)OUTPUT);
+        ble_write(1);
       }
       if (IS_PIN_ANALOG(pin)) {
-        Firmata.write(ANALOG);
-        Firmata.write(10);
+        ble_write(ANALOG);
+        ble_write(10);
       }
       if (IS_PIN_PWM(pin)) {
-        Firmata.write(PWM);
-        Firmata.write(8);
+        ble_write(PWM);
+        ble_write(8);
       }
       if (IS_PIN_SERVO(pin)) {
-        Firmata.write(SERVO);
-        Firmata.write(14);
+        ble_write(SERVO);
+        ble_write(14);
       }
       if (IS_PIN_I2C(pin)) {
-        Firmata.write(I2C);
-        Firmata.write(1);  // to do: determine appropriate value 
+        ble_write(I2C);
+        ble_write(1);  // to do: determine appropriate value 
       }
-      Firmata.write(127);
+      ble_write(127);
+      ble_do_events();
     }
-    Firmata.write(END_SYSEX);
+    ble_write(END_SYSEX);
     break;
   case PIN_STATE_QUERY:
     if (argc > 0) {
       byte pin=argv[0];
-      Firmata.write(START_SYSEX);
-      Firmata.write(PIN_STATE_RESPONSE);
-      Firmata.write(pin);
+      ble_write(START_SYSEX);
+      ble_write(PIN_STATE_RESPONSE);
+      ble_write(pin);
       if (pin < TOTAL_PINS) {
-        Firmata.write((byte)pinConfig[pin]);
-	Firmata.write((byte)pinState[pin] & 0x7F);
-	if (pinState[pin] & 0xFF80) Firmata.write((byte)(pinState[pin] >> 7) & 0x7F);
-	if (pinState[pin] & 0xC000) Firmata.write((byte)(pinState[pin] >> 14) & 0x7F);
+        ble_write((byte)pinConfig[pin]);
+	ble_write((byte)pinState[pin] & 0x7F);
+	if (pinState[pin] & 0xFF80) ble_write((byte)(pinState[pin] >> 7) & 0x7F);
+	if (pinState[pin] & 0xC000) ble_write((byte)(pinState[pin] >> 14) & 0x7F);
       }
-      Firmata.write(END_SYSEX);
+      ble_write(END_SYSEX);
     }
     break;
   case ANALOG_MAPPING_QUERY:
-    Firmata.write(START_SYSEX);
-    Firmata.write(ANALOG_MAPPING_RESPONSE);
+    ble_write(START_SYSEX);
+    ble_write(ANALOG_MAPPING_RESPONSE);
     for (byte pin=0; pin < TOTAL_PINS; pin++) {
-      Firmata.write(IS_PIN_ANALOG(pin) ? PIN_TO_ANALOG(pin) : 127);
+      ble_write(IS_PIN_ANALOG(pin) ? PIN_TO_ANALOG(pin) : 127);
+      if(pin % 18 == 0)
+        ble_do_events();
     }
-    Firmata.write(END_SYSEX);
+    ble_write(END_SYSEX);
     break;
   }
 }
@@ -594,8 +602,9 @@ void setup()
   Firmata.attach(START_SYSEX, sysexCallback);
   Firmata.attach(SYSTEM_RESET, systemResetCallback);
 
-  Firmata.begin(57600);
+  Firmata.begin();
   systemResetCallback();  // reset to default config
+  ble_begin();
 }
 
 /*==============================================================================
@@ -637,4 +646,5 @@ void loop()
       }
     }
   }
+  ble_do_events();
 }
