@@ -1,4 +1,34 @@
-/*
+/* Standard Firmata altered for Bean.
+ * biggest change so far was just adding Bean sleep at the end of loop to 
+ * allow bean to sleep for power saves. Adjust to taste 
+ *
+ * The big gotcha is that theyve actually moved pins around. Until we find
+ * a way around this, dont use the pins marked on the Bean, but rather: 
+ * a0 -> a4
+ * a1 -> a5
+ * d0 -> d6
+ * d1 -> d9
+ * d2 -> d10
+ * d3 -> d11
+ * d4 -> d12
+ * d5 -> d13
+ * For more info, see pins_arduino in the Bean Variants folder.
+ *
+ * I would avoid all other pins which still exist and could be hooked
+ * up to anything for all I know. This sketch doesnt protect any pins. 
+ * Setting anything else very well may take your bean offline or worse..
+ *
+ * For more info see the Bean Arduino guide
+ * http://punchthrough.com/bean/arduino-users-guide/
+ *
+ * TODO
+ * -resolve the odd pin mapping
+ * -protect serial pins and other unavailable pins
+ * -test servo/pwm/and other functionality especially with sleep...
+ * -create a Firmata Boards.h entry thats more accurate
+ */
+
+ /*
  * Firmata is a generic protocol for communicating with microcontrollers
  * from software on a host computer. It is intended to work with
  * any host computer software package.
@@ -275,7 +305,7 @@ void digitalWriteCallback(byte port, int value)
     lastPin = port*8+8;
     if (lastPin > TOTAL_PINS) lastPin = TOTAL_PINS;
     for (pin=port*8; pin < lastPin; pin++) {
-      // do not disturb non-digital pins (eg, Rx & Tx)
+      // do not disturb non-digital pins (eg, Rx & Tx) //JJR TODO swap for 6 and 9
       if (IS_PIN_DIGITAL(pin)) {
         // only write to OUTPUT and INPUT (enables pullup)
         // do not touch pins in PWM, ANALOG, SERVO or other modes
@@ -637,4 +667,5 @@ void loop()
       }
     }
   }
+  Bean.sleep(100); //JJR
 }
